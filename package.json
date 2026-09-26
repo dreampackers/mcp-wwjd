@@ -10,8 +10,8 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/index.js",
-    "inspector": "npx @modelcontextprotocol/inspector node dist/index.js"
+    "start": "node --env-file=.env dist/index.js",
+    "inspector": "npx @modelcontextprotocol/inspector node --env-file=.env dist/index.js"
   },
   "files": [
     "dist"
@@ -35,6 +35,6 @@
     "typescript": "^5.7.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.6.0"
   }
 }
