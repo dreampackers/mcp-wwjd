@@ -22,6 +22,40 @@ Claude(Desktop/Code)에서 작성한 글을 워드프레스 사이트로 바로 
 기본적으로 글은 `draft`(초안) 상태로 생성되어, 워드프레스 관리자 화면에서 검토 후 발행할 수 있습니다.
 바로 발행하려면 도구 호출 시 `status: "publish"`를 지정하면 됩니다.
 
+## 0. 테스트할 워드프레스 사이트가 없다면? (Docker로 로컬 서버 구성)
+
+실제 워드프레스 사이트가 없어도 `local-wordpress/` 폴더의 Docker Compose 설정으로
+내 컴퓨터에 테스트용 워드프레스를 몇 분 안에 띄울 수 있습니다. (Docker Desktop 필요)
+
+```bash
+cd local-wordpress
+./setup.sh
+```
+
+이 스크립트가 자동으로:
+1. MySQL + WordPress 컨테이너를 실행 (`http://localhost:8080`)
+2. WordPress 설치 마법사를 대신 실행 (admin 계정 자동 생성)
+3. 고유주소(permalink)를 설정 (REST API의 `/wp-json/` 경로에 필요)
+4. **Application Passwords 기능을 활성화** — 워드프레스는 HTTPS가 아닌 사이트에서는
+   `WP_ENVIRONMENT_TYPE` 상수가 `local`로 설정돼 있지 않으면 이 기능을 기본적으로
+   비활성화합니다. 로컬 Docker처럼 HTTP로만 접근하는 환경에서 흔히 걸리는 함정이라
+   스크립트가 자동으로 처리합니다.
+5. Application Password를 발급하고, `.env`에 그대로 붙여넣을 수 있는 값을 출력
+
+출력된 `WP_SITE_URL` / `WP_USERNAME` / `WP_APP_PASSWORD` 값을 프로젝트 루트의 `.env`에
+붙여넣으면, 아래 4·5단계(Claude 연동)를 실제 워드프레스 대신 이 로컬 사이트로 그대로
+테스트할 수 있습니다. 관리자 화면은 브라우저에서 `http://localhost:8080/wp-admin`으로
+접속해 확인할 수 있습니다 (로그인: `admin` / `TestPass123!`).
+
+테스트가 끝나면 정리:
+```bash
+cd local-wordpress
+docker compose down -v   # 컨테이너와 데이터를 모두 삭제
+```
+
+> 이 로컬 사이트는 어디까지나 개발/테스트용입니다. 실제 서비스 중인 워드프레스에
+> 발행하려면 1단계부터 진행해 실제 사이트의 Application Password를 발급받으세요.
+
 ## 1. 워드프레스에서 Application Password 발급받기
 
 1. 워드프레스 관리자 화면 로그인 → **사용자(Users) → 프로필(Profile)** 이동
@@ -107,6 +141,16 @@ Claude는 `wp_create_post` 도구를 호출해 마크다운 본문을 HTML로 �
 npm run dev    # tsc --watch
 npm run inspector  # MCP Inspector로 도구를 직접 테스트
 ```
+
+## 트러블슈팅
+
+| 증상 | 원인 | 해결 |
+| --- | --- | --- |
+| `401 rest_not_logged_in` | Application Password가 비활성화됨 (HTTPS가 아니고 `WP_ENVIRONMENT_TYPE`도 `local`이 아닌 경우) | HTTPS 사용, 또는 로컬 환경이면 `wp config set WP_ENVIRONMENT_TYPE local --type=constant` |
+| `401 rest_not_logged_in` (그 외) | Authorization 헤더가 서버에서 탈락됨 (일부 Apache+PHP-FPM/공유호스팅) | `.htaccess`에 `RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]` 추가 |
+| `403 rest_cannot_*` | 계정 권한 부족 | 편집자 이상 권한 계정의 Application Password 사용 |
+| `404` + HTML 페이지 | 고유주소(permalink)가 "기본(Plain)"으로 설정됨 | 설정 → 고유주소를 "글 이름" 등으로 변경 |
+| 이미지 업로드 실패 | 원본 이미지 URL이 공개 접근 불가, 또는 호스팅 업로드 용량 제한 | 공개 URL인지 확인, `upload_max_filesize` 확인 |
 
 ## 보안 참고사항
 
